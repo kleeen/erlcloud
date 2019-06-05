@@ -3,6 +3,7 @@
 -include("erlcloud.hrl").
 -include("erlcloud_aws.hrl").
 
+-export([backoff/1, retry/2]).
 -export([request/3]).
 
 -type json_return() :: {ok, jsx:json_term()} | {error, term()}.
@@ -125,4 +126,3 @@ port_spec(#aws_config{textract_port=80}) ->
     "";
 port_spec(#aws_config{textract_port=Port}) ->
     [":", erlang:integer_to_list(Port)].
-
