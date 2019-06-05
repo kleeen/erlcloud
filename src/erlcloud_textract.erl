@@ -5,6 +5,7 @@
 %%% Library initialization.
 -export([configure/2, configure/3, configure/4,  new/2, new/3]).
 
+-export([analyze_document_base64/1]).
 -export([analyze_document/2]).
 -export([analyze_document_async/2]).
 -export([analyze_document_async_status/1]).
@@ -77,3 +78,9 @@ analyze_document_async(Bucket, Filename) ->
 analyze_document_async_status(JobId) ->
    Json = [{<<"JobId">>, JobId}],
    erlcloud_textract_impl:request(default_config(), "Textract.GetDocumentTextDetection", Json).
+
+-spec analyze_document_base64/1 :: (binary()) -> proplist().
+
+analyze_document_base64(Base64Image) ->
+   Json = [{<<"FeatureTypes">>, [<<"FORMS">>]}, {<<"Document">>, [{<<"Bytes">>, Base64Image}]}],
+   erlcloud_textract_impl:request(default_config(), "Textract.AnalyzeDocument", Json).
