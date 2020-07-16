@@ -6,10 +6,27 @@
 
 -export([assume_role/4, assume_role/5,
          get_federation_token/3,
-         get_federation_token/4]).
+         get_federation_token/4,
+         get_session_token/2]).
 
 -define(API_VERSION, "2011-06-15").
 
+-spec get_session_token/2 :: (#aws_config{}, non_neg_integer()) -> proplist().
+get_session_token(AwsConfig, DurationSeconds) ->
+    Params =
+        [
+            {"DurationSeconds", DurationSeconds}
+        ],
+    Xml = sts_query(AwsConfig, "GetSessionToken", Params),
+    Creds = erlcloud_xml:decode(
+        [
+            {access_key_id    , "GetSessionTokenResult/Credentials/SessionToken"    , text},
+            {secret_access_key, "GetSessionTokenResult/Credentials/SecretAccessKey", text},
+            {session_token    , "GetSessionTokenResult/Credentials/AccessKeyId"   , text},
+            {expiration       , "GetSessionTokenResult/Credentials/Expiration"     , time}
+        ],
+        Xml),
+    Creds.
 
 assume_role(AwsConfig, RoleArn, RoleSessionName, DurationSeconds) ->
     assume_role(AwsConfig, RoleArn, RoleSessionName, DurationSeconds, undefined).
