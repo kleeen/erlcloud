@@ -20,9 +20,9 @@ get_session_token(AwsConfig, DurationSeconds) ->
     Xml = sts_query(AwsConfig, "GetSessionToken", Params),
     Creds = erlcloud_xml:decode(
         [
-            {access_key_id    , "GetSessionTokenResult/Credentials/SessionToken"    , text},
+            {access_key_id    , "GetSessionTokenResult/Credentials/AccessKeyId"    , text},
             {secret_access_key, "GetSessionTokenResult/Credentials/SecretAccessKey", text},
-            {session_token    , "GetSessionTokenResult/Credentials/AccessKeyId"   , text},
+            {session_token    , "GetSessionTokenResult/Credentials/SessionToken"   , text},
             {expiration       , "GetSessionTokenResult/Credentials/Expiration"     , time}
         ],
         Xml),
