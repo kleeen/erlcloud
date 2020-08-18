@@ -7,6 +7,7 @@ Service APIs implemented:
 - Amazon Elastic Compute Cloud (EC2)
 - Amazon Simple Storage Service (S3)
 - Amazon Simple Queue Service (SQS)
+- Athena
 - Amazon SimpleDB
 - Amazon Mechanical Turk
 - Amazon CloudWatch (MON)
