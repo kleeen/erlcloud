@@ -61,25 +61,25 @@ configure(AccessKeyID, SecretAccessKey, Host, Port) ->
 
 default_config() -> erlcloud_aws:default_config().
 
--spec analyze_document/2 :: (binary(), binary()) -> proplist().
+-spec analyze_document(binary(), binary()) -> proplist().
 
 analyze_document(Bucket, Filename) ->
    Json = [{<<"FeatureTypes">>, [<<"FORMS">>]}, {<<"Document">>, [{<<"S3Object">>, [{<<"Bucket">>, Bucket}, {<<"Name">>, Filename}]}]}],
    erlcloud_textract_impl:request(default_config(), "Textract.AnalyzeDocument", Json).
 
--spec analyze_document_async/2 :: (binary(), binary()) -> proplist().
+-spec analyze_document_async(binary(), binary()) -> proplist().
 
 analyze_document_async(Bucket, Filename) ->
    Json = [{<<"FeatureTypes">>, [<<"FORMS">>]}, {<<"DocumentLocation">>, [{<<"S3Object">>, [{<<"Bucket">>, Bucket}, {<<"Name">>, Filename}]}]}],
    erlcloud_textract_impl:request(default_config(), "Textract.StartDocumentTextDetection", Json).
 
--spec analyze_document_async_status/1 :: (binary()) -> proplist().
+-spec analyze_document_async_status(binary()) -> proplist().
 
 analyze_document_async_status(JobId) ->
    Json = [{<<"JobId">>, JobId}],
    erlcloud_textract_impl:request(default_config(), "Textract.GetDocumentTextDetection", Json).
 
--spec analyze_document_base64/1 :: (binary()) -> proplist().
+-spec analyze_document_base64(binary()) -> proplist().
 
 analyze_document_base64(Base64Image) ->
    Json = [{<<"FeatureTypes">>, [<<"FORMS">>]}, {<<"Document">>, [{<<"Bytes">>, Base64Image}]}],

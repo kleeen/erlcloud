@@ -18,7 +18,7 @@
 -define(UTC_TO_GREGORIAN, 62167219200).
 -define(EXTERNAL_ID_MAX_LEN, 1224).
 
--spec get_session_token/2 :: (#aws_config{}, non_neg_integer()) -> proplist().
+-spec get_session_token(#aws_config{}, non_neg_integer()) -> proplist().
 get_session_token(AwsConfig, DurationSeconds) ->
     Params =
         [
