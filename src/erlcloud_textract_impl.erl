@@ -6,6 +6,8 @@
 -export([backoff/1, retry/2]).
 -export([request/3]).
 
+-export_type([json_return/0, attempt/0, retry_fun/0]).
+
 -type json_return() :: {ok, jsx:json_term()} | {error, term()}.
 
 -type operation() :: string().
