@@ -1,3 +1,8 @@
+-ifndef(erlcloud_ec2_hrl).
+-define(erlcloud_ec2_hrl, 0).
+
+-include("erlcloud.hrl").
+
 -type(ec2_shutdown_behavior() :: stop | terminate | undefined).
 -type(ec2_volume_size() :: 1..1024).
 
@@ -6,41 +11,42 @@
           virtual_name::string(),
           snapshot_id::string(),
           volume_size::ec2_volume_size(),
-          delete_on_termination::boolean()
+          delete_on_termination::boolean(),
+          encrypted::boolean()
          }).
 -type(ec2_block_device_mapping() :: #ec2_block_device_mapping{}).
 
 %% Network interface (used by launch specification)
 -record(ec2_net_if, {
-          device_index   :: string(),
-          subnet_id      :: string(),
-          security_group :: [string()],
-          private_ip     :: [string()],
-          associate_public_ip :: boolean()
+          device_index        :: string(),
+          subnet_id           :: string(),
+          security_group=[]   :: [string()],
+          private_ip=[]       :: [string()],
+          associate_public_ip :: undefined | boolean()
 }).
 
 -record(ec2_instance_spec, {
           image_id::string(),
           min_count=1::pos_integer(),
           max_count=1::pos_integer(),
-          key_name::string(),
+          key_name::undefined | string(),
           group_set=["default"]::[string()],
-          user_data::binary(),
+          user_data::undefined|binary(),
           instance_type::string(),
-          availability_zone::string(),
-          placement_group::string(),
-          kernel_id::string(),
-          ramdisk_id::string(),
+          availability_zone::undefined | string(),
+          placement_group::undefined | string(),
+          kernel_id::undefined | string(),
+          ramdisk_id::undefined | string(),
           block_device_mapping=[]::[ec2_block_device_mapping()],
           monitoring_enabled=false::boolean(),
           subnet_id::string(),
           disable_api_termination=false::boolean(),
-          instance_initiated_shutdown_behavior::ec2_shutdown_behavior(),
+          instance_initiated_shutdown_behavior::undefined | ec2_shutdown_behavior(),
           net_if=[] :: [#ec2_net_if{}],
           ebs_optimized = false :: boolean(),
-          iam_instance_profile_name = undefined :: string(),
-          spot_price::string(),
-          weighted_capacity::number()
+          iam_instance_profile_name :: undefined | string(),
+          spot_price::undefined | string(),
+          weighted_capacity::undefined | number()
          }).
 -record(ec2_image_spec, {
           image_location::string(),
@@ -63,16 +69,16 @@
           launch_specification::#ec2_instance_spec{}
          }).
 -record(spot_fleet_request_config_spec, {
-          allocation_strategy::lowest_price|diversified,
-          client_token::string(),
-          excess_capacity_termination_policy::no_termination|default,
+          allocation_strategy::undefined|lowest_price|diversified,
+          client_token::undefined|string(),
+          excess_capacity_termination_policy::undefined|no_termination|default,
           iam_fleet_role::string(),
           launch_specification=[]::[#ec2_instance_spec{}],
           spot_price::string(),
           target_capacity::pos_integer(),
-          terminate_instances_with_expiration::true|false,
-          valid_from::datetime(),
-          valid_until::datetime()
+          terminate_instances_with_expiration::undefined|true|false,
+          valid_from::undefined|datetime(),
+          valid_until::undefined|datetime()
          }).
 -record(ec2_spot_fleet_request, {
           spot_fleet_request_config::#spot_fleet_request_config_spec{}
@@ -89,10 +95,28 @@
           ip_protocol::tcp|udp|icmp,
           from_port::-1 | 0..65535,
           to_port::-1 | 0..65535,
+          user_id::undefined|[string()],
+          group_name::undefined|[string()],
+          group_id::undefined|[string()],
+          cidr_ip::undefined|[string()]
+         }).
+-record(vpc_egress_spec, {
+          ip_protocol::tcp|udp|icmp,
+          from_port::-1 | 0..65535,
+          to_port::-1 | 0..65535,
           user_id::[string()],
           group_name::[string()],
           group_id::[string()],
           cidr_ip::[string()]
+         }).
+-record(vpc_xgress_internal_spec, {
+          ip_protocol::tcp|udp|icmp,
+          from_port::-1 | 0..65535,
+          to_port::-1 | 0..65535,
+          user_id::undefined|[string()],
+          group_name::undefined|[string()],
+          group_id::undefined|[string()],
+          cidr_ip::undefined|[string()]
          }).
 
 -record(ec2_network_acl_spec, {
@@ -114,6 +138,7 @@
 -type(ec2_spot_instance_request() :: #ec2_spot_instance_request{}).
 -type(ec2_spot_fleet_request() :: #ec2_spot_fleet_request{}).
 -type(vpc_ingress_spec() :: #vpc_ingress_spec{}).
+-type(vpc_egress_spec() :: #vpc_egress_spec{}).
 -type(ec2_network_acl_spec() :: #ec2_network_acl_spec{}).
 
 -record(ec2_tag, {
@@ -123,4 +148,4 @@
           value :: string()
          }).
 
-
+-endif.

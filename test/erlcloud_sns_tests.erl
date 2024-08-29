@@ -2,7 +2,7 @@
 -module(erlcloud_sns_tests).
 -include_lib("eunit/include/eunit.hrl").
 % -include("erlcloud.hrl").
--include_lib("erlcloud/include/erlcloud_aws.hrl").
+-include("erlcloud_aws.hrl").
 
 %% Unit tests for sns.
 %% These tests work by using meck to mock httpc. There are two classes of test: input and output.
@@ -26,7 +26,7 @@ sns_api_test_() ->
     {foreach,
      fun start/0,
      fun stop/1,
-     [fun defaults_to_http/1,
+     [fun defaults_to_https/1,
       fun supports_explicit_http/1,
       fun supports_https/1,
       fun is_case_insensitive/1,
@@ -37,10 +37,23 @@ sns_api_test_() ->
       fun delete_topic_input_tests/1,
       fun subscribe_input_tests/1,
       fun subscribe_output_tests/1,
+      fun create_platform_application_input_tests/1,
+      fun create_platform_application_output_tests/1,
+      fun get_platform_application_attributes_input_tests/1,
+      fun get_platform_application_attributes_output_tests/1,
+      fun set_platform_application_attributes_input_tests/1,
+      fun set_platform_application_attributes_output_tests/1,
       fun set_topic_attributes_input_tests/1,
       fun set_topic_attributes_output_tests/1,
+      fun set_subscription_attributes_input_tests/1,
+      fun set_subscription_attributes_output_tests/1,
       fun list_topics_input_tests/1,
-      fun list_topics_output_tests/1
+      fun list_topics_output_tests/1,
+      fun list_subscriptions_input_tests/1,
+      fun list_subscriptions_output_tests/1,
+      fun list_subscriptions_by_topic_input_tests/1,
+      fun list_subscriptions_by_topic_output_tests/1,
+      fun publish_invalid_xml_response_output_tests/1
      ]}.
 
 start() ->
@@ -156,7 +169,12 @@ output_test(Fun, {Line, {Description, Response, Result}}) ->
       fun() ->
               meck:expect(erlcloud_httpc, request, output_expect(Response)),
               erlcloud_ec2:configure(string:copies("A", 20), string:copies("a", 40)),
-              Actual = Fun(),
+              Actual = try
+                  Fun()
+                catch
+                  _Class:Error ->
+                    Error
+                end,
               ?assertEqual(Result, Actual)
       end}}.
 
@@ -273,13 +291,142 @@ subscribe_output_tests(_) ->
                                         "arn:aws:sns:us-west-2:123456789012:MyTopic")), Tests).
 
 
+create_platform_application_input_tests(_) ->
+    Tests =
+        [?_sns_test(
+            {"Test to create platform application.",
+                ?_f(erlcloud_sns:create_platform_application("TestApp", "ADM")),
+                [
+                    {"Action", "CreatePlatformApplication"},
+                    {"Name", "TestApp"},
+                    {"Platform", "ADM"}
+                ]})
+        ],
+
+    Response = "
+                <CreatePlatformApplicationResponse xmlns=\"https://sns.amazonaws.com/doc/2010-03-31/\">
+                    <CreatePlatformApplicationResult>
+                        <PlatformApplicationArn>arn:aws:sns:us-west-2:123456789012:app/ADM/TestApp</PlatformApplicationArn>
+                    </CreatePlatformApplicationResult>
+                    <ResponseMetadata>
+                        <RequestId>b6f0e78b-e9d4-5a0e-b973-adc04e8a4ff9</RequestId>
+                    </ResponseMetadata>
+                </CreatePlatformApplicationResponse>",
+
+    input_tests(Response, Tests).
+
+create_platform_application_output_tests(_) ->
+    Tests = [?_sns_test(
+        {"This is a create platform application test.",
+            "<CreatePlatformApplicationResponse xmlns=\"https://sns.amazonaws.com/doc/2010-03-31/\">
+                <CreatePlatformApplicationResult>
+                    <PlatformApplicationArn>arn:aws:sns:us-west-2:123456789012:app/ADM/TestApp</PlatformApplicationArn>
+                </CreatePlatformApplicationResult>
+                <ResponseMetadata>
+                    <RequestId>b6f0e78b-e9d4-5a0e-b973-adc04e8a4ff9</RequestId>
+                </ResponseMetadata>
+            </CreatePlatformApplicationResponse>",
+            "arn:aws:sns:us-west-2:123456789012:app/ADM/TestApp"})
+    ],
+    output_tests(?_f(erlcloud_sns:create_platform_application("ADM", "TestApp")), Tests).
+
+
+get_platform_application_attributes_input_tests(_) ->
+    Tests =
+        [?_sns_test(
+            {"Test to get platform application attributes.",
+                ?_f(erlcloud_sns:get_platform_application_attributes("TestAppArn")),
+                [
+                    {"Action", "GetPlatformApplicationAttributes"},
+                    {"PlatformApplicationArn", "TestAppArn"}
+                ]})
+        ],
+
+    Response = "
+                <GetPlatformApplicationAttributesResponse xmlns=\"https://sns.amazonaws.com/doc/2010-03-31/\">
+                    <GetPlatformApplicationAttributesResult>
+                        <Attributes>
+                            <entry>
+                                <key>EventDeliveryFailure</key>
+                                <value>arn:aws:sns:us-west-2:123456789012:topicarn</value>
+                            </entry>
+                        </Attributes>
+                    </GetPlatformApplicationAttributesResult>
+                    <ResponseMetadata>
+                        <RequestId>b6f0e78b-e9d4-5a0e-b973-adc04e8a4ff9</RequestId>
+                    </ResponseMetadata>
+                </GetPlatformApplicationAttributesResponse>",
+
+    input_tests(Response, Tests).
+
+get_platform_application_attributes_output_tests(_) ->
+    Tests = [?_sns_test(
+        {"This is a get platform application attributes test.",
+         "<GetPlatformApplicationAttributesResponse xmlns=\"https://sns.amazonaws.com/doc/2010-03-31/\">
+              <GetPlatformApplicationAttributesResult>
+                  <Attributes>
+                      <entry>
+                          <key>EventDeliveryFailure</key>
+                          <value>arn:aws:sns:us-west-2:123456789012:topicarn</value>
+                      </entry>
+                  </Attributes>
+              </GetPlatformApplicationAttributesResult>
+              <ResponseMetadata>
+                  <RequestId>b6f0e78b-e9d4-5a0e-b973-adc04e8a4ff9</RequestId>
+              </ResponseMetadata>
+          </GetPlatformApplicationAttributesResponse>",
+         [{arn, "TestAppArn"},
+          {attributes, [{event_delivery_failure, "arn:aws:sns:us-west-2:123456789012:topicarn"}]}]
+        })
+    ],
+    output_tests(?_f(erlcloud_sns:get_platform_application_attributes("TestAppArn")), Tests).
+
+
+set_platform_application_attributes_input_tests(_) ->
+    Tests =
+        [?_sns_test(
+            {"Test to set platform application attributes.",
+                ?_f(erlcloud_sns:set_platform_application_attributes(
+                    "TestAppArn",
+                    [{platform_principal, "some-api-key"}])),
+                [
+                    {"Action", "SetPlatformApplicationAttributes"},
+                    {"PlatformApplicationArn", "TestAppArn"},
+                    {"Attributes.entry.1.key", "PlatformPrincipal"},
+                    {"Attributes.entry.1.value", "some-api-key"}
+                ]})
+        ],
+
+    Response = "
+                <SetPlatformApplicationAttributesResponse xmlns=\"https://sns.amazonaws.com/doc/2010-03-31/\">
+                    <ResponseMetadata>
+                        <RequestId>cf577bcc-b3dc-5463-88f1-3180b9412395</RequestId>
+                    </ResponseMetadata>
+                </SetPlatformApplicationAttributesResponse>",
+    input_tests(Response, Tests).
+
+set_platform_application_attributes_output_tests(_) ->
+    Tests = [?_sns_test(
+        {"This is a set platform application attributes test.",
+         "<SetPlatformApplicationAttributesResponse xmlns=\"https://sns.amazonaws.com/doc/2010-03-31/\">
+             <ResponseMetadata>
+                 <RequestId>cf577bcc-b3dc-5463-88f1-3180b9412395</RequestId>
+             </ResponseMetadata>
+          </SetPlatformApplicationAttributesResponse>",
+         "cf577bcc-b3dc-5463-88f1-3180b9412395"
+        })
+    ],
+    output_tests(?_f(
+        erlcloud_sns:set_platform_application_attributes("TestAppArn", [{platform_principal, "some-api_key"}])), Tests).
+
+
 %% Set topic attributes test based on the API examples:
 %% http://docs.aws.amazon.com/sns/latest/APIReference/API_SetTopicAttributes.html
 set_topic_attributes_input_tests(_) ->
     Tests =
         [?_sns_test(
             {"Test sets topic's attribute.",
-             ?_f(erlcloud_sns:set_topic_attributes("DisplayName", "MyTopicName", "arn:aws:sns:us-west-2:123456789012:MyTopic")),
+             ?_f(erlcloud_sns:set_topic_attributes('DisplayName', "MyTopicName", "arn:aws:sns:us-west-2:123456789012:MyTopic")),
              [
               {"Action", "SetTopicAttributes"},
               {"AttributeName", "DisplayName"},
@@ -307,7 +454,45 @@ set_topic_attributes_output_tests(_) ->
                     </SetTopicAttributesResponse>",
                 ok})
             ],
-    output_tests(?_f(erlcloud_sns:set_topic_attributes("DisplayName", "MyTopicName", "arn:aws:sns:us-west-2:123456789012:MyTopic")), Tests).
+    output_tests(?_f(erlcloud_sns:set_topic_attributes('DisplayName', "MyTopicName", "arn:aws:sns:us-west-2:123456789012:MyTopic")), Tests).
+
+
+%% Set subscription attributes test based on the API examples:
+%% https://docs.aws.amazon.com/sns/latest/api/API_SetSubscriptionAttributes.html
+set_subscription_attributes_input_tests(_) ->
+    Tests =
+    [?_sns_test(
+        {"Test sets subscriptions's attribute.",
+         ?_f(erlcloud_sns:set_subscription_attributes('FilterPolicy', "{\"a\": [\"b\"]}", "arn:aws:sns:us-east-1:123456789012:My-Topic:80289ba6-0fd4-4079-afb4-ce8c8260f0ca")),
+         [
+             {"Action", "SetSubscriptionAttributes"},
+             {"AttributeName", "FilterPolicy"},
+             {"AttributeValue", "%7B%22a%22%3A%20%5B%22b%22%5D%7D"},    % Url encoded version of above filter policy
+             {"SubscriptionArn", "arn%3Aaws%3Asns%3Aus-east-1%3A123456789012%3AMy-Topic%3A80289ba6-0fd4-4079-afb4-ce8c8260f0ca"}
+         ]})
+    ],
+
+    Response = "
+               <SetSubscriptionAttributesResponse xmlns=\"http://sns.amazonaws.com/doc/2010-03-31/\">
+                  <ResponseMetadata>
+                    <RequestId>a8763b99-33a7-11df-a9b7-05d48da6f042</RequestId>
+                  </ResponseMetadata>
+               </SetSubscriptionAttributesResponse> ",
+
+    input_tests(Response, Tests).
+
+set_subscription_attributes_output_tests(_) ->
+    Tests = [?_sns_test(
+        {"This test sets subscription's attribute.",
+         "<SetSubscriptionAttributesResponse xmlns=\"http://sns.amazonaws.com/doc/2010-03-31/\">
+          <ResponseMetadata>
+            <RequestId>a8763b99-33a7-11df-a9b7-05d48da6f042</RequestId>
+          </ResponseMetadata>
+        </SetSubscriptionAttributesResponse>",
+         ok})
+    ],
+    output_tests(?_f(erlcloud_sns:set_subscription_attributes('FilterPolicy', "{\"a\": [\"b\"]}", "arn:aws:sns:us-east-1:123456789012:My-Topic:80289ba6-0fd4-4079-afb4-ce8c8260f0ca")), Tests).
+
 
 %% List topics test based on the API example:
 %% http://docs.aws.amazon.com/sns/latest/APIReference/API_ListTopics.html
@@ -425,12 +610,287 @@ list_topics_output_tests(_) ->
                   ]})
             ]).
 
+%% List Subscriptions test based on the API example:
+%% http://docs.aws.amazon.com/sns/latest/api/API_ListSubscriptions.html
+list_subscriptions_input_tests(_) ->
+  Tests =
+    [?_sns_test(
+      {"Test lists Subscriptions.",
+        ?_f(erlcloud_sns:list_subscriptions()),
+        [
+          {"Action","ListSubscriptions"}
+        ]}),
+      ?_sns_test(
+        {"Test lists Subscriptions token.",
+          ?_f(erlcloud_sns:list_subscriptions("Token")),
+          [
+            {"Action","ListSubscriptions"},
+            {"NextToken", "Token"}
+          ]}),
+      ?_sns_test(
+        {"Test lists Subscriptions all.",
+          ?_f(erlcloud_sns:list_subscriptions_all()),
+          [
+            {"Action","ListSubscriptions"}
+          ]})
+    ],
+
+  Response = "<ListSubscriptionsResponse xmlns=\"http://sns.amazonaws.com/doc/2010-03-31/\">
+               <ListSubscriptionsResult>
+                <Subscriptions>
+                 <member>
+                  <TopicArn>arn:aws:sns:us-east-1:698519295917:My-Topic</TopicArn>
+                  <Protocol>email</Protocol>
+                  <SubscriptionArn>arn:aws:sns:us-east-1:123456789012:My-Topic:80289ba6-0fd4-4079-afb4-ce8c8260f0ca</SubscriptionArn>
+                  <Owner>123456789012</Owner>
+                  <Endpoint>example@amazon.com</Endpoint>
+                 </member>
+                </Subscriptions>
+               </ListSubscriptionsResult>
+               <ResponseMetadata>
+               <RequestId>384ac68d-3775-11df-8963-01868b7c937a</RequestId>
+               </ResponseMetadata>
+              </ListSubscriptionsResponse>",
+
+  input_tests(Response, Tests).
+
+list_subscriptions_output_tests(_) ->
+  output_tests(?_f(erlcloud_sns:list_subscriptions()),
+    [?_sns_test(
+      {"Test lists Subscriptions.",
+        "<ListSubscriptionsResponse xmlns=\"http://sns.amazonaws.com/doc/2010-03-31/\">
+          <ListSubscriptionsResult>
+           <Subscriptions>
+            <member>
+             <TopicArn>arn:aws:sns:us-east-1:698519295917:My-Topic</TopicArn>
+             <Protocol>email</Protocol>
+             <SubscriptionArn>arn:aws:sns:us-east-1:123456789012:My-Topic:80289ba6-0fd4-4079-afb4-ce8c8260f0ca</SubscriptionArn>
+             <Owner>123456789012</Owner>
+             <Endpoint>example@amazon.com</Endpoint>
+            </member>
+           </Subscriptions>
+          </ListSubscriptionsResult>
+          <ResponseMetadata>
+          <RequestId>384ac68d-3775-11df-8963-01868b7c937a</RequestId>
+          </ResponseMetadata>
+         </ListSubscriptionsResponse>",
+        [{subscriptions,
+          [
+            [{topic_arn, "arn:aws:sns:us-east-1:698519295917:My-Topic"},
+             {protocol, "email"},
+             {arn, "arn:aws:sns:us-east-1:123456789012:My-Topic:80289ba6-0fd4-4079-afb4-ce8c8260f0ca"},
+             {owner, "123456789012"},
+             {endpoint, "example@amazon.com"}]
+          ]},
+          {next_token, ""}
+        ]}),
+      ?_sns_test(
+        {"Test lists Subscriptions with token.",
+          "<ListSubscriptionsResponse xmlns=\"http://sns.amazonaws.com/doc/2010-03-31/\">
+            <ListSubscriptionsResult>
+             <Subscriptions>
+              <member>
+               <TopicArn>arn:aws:sns:us-east-1:698519295917:My-Topic</TopicArn>
+               <Protocol>email</Protocol>
+               <SubscriptionArn>arn:aws:sns:us-east-1:123456789012:My-Topic:80289ba6-0fd4-4079-afb4-ce8c8260f0ca</SubscriptionArn>
+               <Owner>123456789012</Owner>
+               <Endpoint>example@amazon.com</Endpoint>
+              </member>
+             </Subscriptions>
+             <NextToken>token</NextToken>
+            </ListSubscriptionsResult>
+            <ResponseMetadata>
+            <RequestId>384ac68d-3775-11df-8963-01868b7c937a</RequestId>
+            </ResponseMetadata>
+           </ListSubscriptionsResponse>",
+          [{subscriptions,
+            [
+              [{topic_arn, "arn:aws:sns:us-east-1:698519295917:My-Topic"},
+                {protocol, "email"},
+                {arn, "arn:aws:sns:us-east-1:123456789012:My-Topic:80289ba6-0fd4-4079-afb4-ce8c8260f0ca"},
+                {owner, "123456789012"},
+                {endpoint, "example@amazon.com"}]
+            ]},
+            {next_token, "token"}
+          ]})
+    ]) ++
+  output_tests(?_f(erlcloud_sns:list_subscriptions_all()),
+    [?_sns_test(
+      {"Test lists topics all.",
+        "<ListSubscriptionsResponse xmlns=\"http://sns.amazonaws.com/doc/2010-03-31/\">
+          <ListSubscriptionsResult>
+           <Subscriptions>
+            <member>
+             <TopicArn>arn:aws:sns:us-east-1:698519295917:My-Topic</TopicArn>
+             <Protocol>email</Protocol>
+             <SubscriptionArn>arn:aws:sns:us-east-1:123456789012:My-Topic:80289ba6-0fd4-4079-afb4-ce8c8260f0ca</SubscriptionArn>
+             <Owner>123456789012</Owner>
+             <Endpoint>example@amazon.com</Endpoint>
+            </member>
+           </Subscriptions>
+          </ListSubscriptionsResult>
+          <ResponseMetadata>
+          <RequestId>384ac68d-3775-11df-8963-01868b7c937a</RequestId>
+          </ResponseMetadata>
+         </ListSubscriptionsResponse>",
+        [[{topic_arn, "arn:aws:sns:us-east-1:698519295917:My-Topic"},
+              {protocol, "email"},
+              {arn, "arn:aws:sns:us-east-1:123456789012:My-Topic:80289ba6-0fd4-4079-afb4-ce8c8260f0ca"},
+              {owner, "123456789012"},
+              {endpoint, "example@amazon.com"}]
+        ]})
+    ]).
 
 
-defaults_to_http(_) ->
+%% List Subscriptions By Topic  test based on the API example:
+%% http://docs.aws.amazon.com/sns/latest/api/API_ListSubscriptionsByTopic.html
+list_subscriptions_by_topic_input_tests(_) ->
+  Tests =
+    [?_sns_test(
+      {"Test lists Subscriptions.",
+        ?_f(erlcloud_sns:list_subscriptions_by_topic("Arn")),
+        [
+          {"Action","ListSubscriptionsByTopic"},
+          {"TopicArn", "Arn"}
+        ]}),
+      ?_sns_test(
+        {"Test lists Subscriptions token.",
+          ?_f(erlcloud_sns:list_subscriptions_by_topic("Arn", "Token")),
+          [
+            {"Action","ListSubscriptionsByTopic"},
+            {"TopicArn", "Arn"},
+            {"NextToken", "Token"}
+          ]}),
+      ?_sns_test(
+        {"Test lists Subscriptions all.",
+          ?_f(erlcloud_sns:list_subscriptions_by_topic_all("Arn")),
+          [
+            {"Action","ListSubscriptionsByTopic"},
+            {"TopicArn", "Arn"}
+          ]})
+    ],
+
+  Response = "<ListSubscriptionsByTopicResponse xmlns=\"http://sns.amazonaws.com/doc/2010-03-31/\">
+                <ListSubscriptionsByTopicResult>
+                  <Subscriptions>
+                    <member>
+                      <TopicArn>arn:aws:sns:us-east-1:123456789012:My-Topic</TopicArn>
+                      <Protocol>email</Protocol>
+                      <SubscriptionArn>arn:aws:sns:us-east-1:123456789012:My-Topic:80289ba6-0fd4-4079-afb4-ce8c8260f0ca</SubscriptionArn>
+                      <Owner>123456789012</Owner>
+                      <Endpoint>example@amazon.com</Endpoint>
+                    </member>
+                  </Subscriptions>
+                </ListSubscriptionsByTopicResult>
+                <ResponseMetadata>
+                  <RequestId>b9275252-3774-11df-9540-99d0768312d3</RequestId>
+                </ResponseMetadata>
+              </ListSubscriptionsByTopicResponse>",
+
+  input_tests(Response, Tests).
+
+list_subscriptions_by_topic_output_tests(_) ->
+  output_tests(?_f(erlcloud_sns:list_subscriptions_by_topic("arn:aws:sns:us-east-1:123456789012:My-Topic")),
+    [?_sns_test(
+      {"Test lists Subscriptions.",
+        "<ListSubscriptionsByTopicResponse xmlns=\"http://sns.amazonaws.com/doc/2010-03-31/\">
+          <ListSubscriptionsByTopicResult>
+            <Subscriptions>
+              <member>
+                <TopicArn>arn:aws:sns:us-east-1:123456789012:My-Topic</TopicArn>
+                <Protocol>email</Protocol>
+                <SubscriptionArn>arn:aws:sns:us-east-1:123456789012:My-Topic:80289ba6-0fd4-4079-afb4-ce8c8260f0ca</SubscriptionArn>
+                <Owner>123456789012</Owner>
+                <Endpoint>example@amazon.com</Endpoint>
+              </member>
+            </Subscriptions>
+          </ListSubscriptionsByTopicResult>
+          <ResponseMetadata>
+            <RequestId>b9275252-3774-11df-9540-99d0768312d3</RequestId>
+          </ResponseMetadata>
+        </ListSubscriptionsByTopicResponse>",
+        [{subscriptions,
+          [
+            [{topic_arn, "arn:aws:sns:us-east-1:123456789012:My-Topic"},
+             {protocol, "email"},
+             {arn, "arn:aws:sns:us-east-1:123456789012:My-Topic:80289ba6-0fd4-4079-afb4-ce8c8260f0ca"},
+             {owner, "123456789012"},
+             {endpoint, "example@amazon.com"}]
+          ]},
+          {next_token, ""}
+        ]}),
+      ?_sns_test(
+        {"Test lists Subscriptions with token.",
+          "<ListSubscriptionsByTopicResponse xmlns=\"http://sns.amazonaws.com/doc/2010-03-31/\">
+            <ListSubscriptionsByTopicResult>
+              <Subscriptions>
+                <member>
+                  <TopicArn>arn:aws:sns:us-east-1:123456789012:My-Topic</TopicArn>
+                  <Protocol>email</Protocol>
+                  <SubscriptionArn>arn:aws:sns:us-east-1:123456789012:My-Topic:80289ba6-0fd4-4079-afb4-ce8c8260f0ca</SubscriptionArn>
+                  <Owner>123456789012</Owner>
+                  <Endpoint>example@amazon.com</Endpoint>
+                </member>
+              </Subscriptions>
+              <NextToken>token</NextToken>
+            </ListSubscriptionsByTopicResult>
+            <ResponseMetadata>
+              <RequestId>b9275252-3774-11df-9540-99d0768312d3</RequestId>
+            </ResponseMetadata>
+          </ListSubscriptionsByTopicResponse>",
+          [{subscriptions,
+            [
+              [{topic_arn, "arn:aws:sns:us-east-1:123456789012:My-Topic"},
+                {protocol, "email"},
+                {arn, "arn:aws:sns:us-east-1:123456789012:My-Topic:80289ba6-0fd4-4079-afb4-ce8c8260f0ca"},
+                {owner, "123456789012"},
+                {endpoint, "example@amazon.com"}]
+            ]},
+            {next_token, "token"}
+          ]})
+    ]) ++
+  output_tests(?_f(erlcloud_sns:list_subscriptions_by_topic_all("arn:aws:sns:us-east-1:123456789012:My-Topic")),
+    [?_sns_test(
+      {"Test lists topics all.",
+        "<ListSubscriptionsByTopicResponse xmlns=\"http://sns.amazonaws.com/doc/2010-03-31/\">
+             <ListSubscriptionsByTopicResult>
+               <Subscriptions>
+                 <member>
+                   <TopicArn>arn:aws:sns:us-east-1:123456789012:My-Topic</TopicArn>
+                   <Protocol>email</Protocol>
+                   <SubscriptionArn>arn:aws:sns:us-east-1:123456789012:My-Topic:80289ba6-0fd4-4079-afb4-ce8c8260f0ca</SubscriptionArn>
+                   <Owner>123456789012</Owner>
+                   <Endpoint>example@amazon.com</Endpoint>
+                 </member>
+               </Subscriptions>
+             </ListSubscriptionsByTopicResult>
+             <ResponseMetadata>
+               <RequestId>b9275252-3774-11df-9540-99d0768312d3</RequestId>
+             </ResponseMetadata>
+           </ListSubscriptionsByTopicResponse>",
+        [[{topic_arn, "arn:aws:sns:us-east-1:123456789012:My-Topic"},
+              {protocol, "email"},
+              {arn, "arn:aws:sns:us-east-1:123456789012:My-Topic:80289ba6-0fd4-4079-afb4-ce8c8260f0ca"},
+              {owner, "123456789012"},
+              {endpoint, "example@amazon.com"}]
+        ]})
+    ]).
+
+publish_invalid_xml_response_output_tests(_) ->
+  Config = erlcloud_aws:default_config(),
+  output_tests(?_f(erlcloud_sns:publish(topic, "arn:aws:sns:us-east-1:123456789012:My-Topic", "test message", undefined, Config)),
+    [?_sns_test(
+      {"Test PublishTopic invalid XML return",
+        "",
+        {sns_error, {aws_error, {invalid_xml_response_document, <<>>}}}})
+    ]).
+
+
+
+defaults_to_https(_) ->
     Config = erlcloud_aws:default_config(),
     erlcloud_sns:publish_to_topic("topicarn", "message", "subject", Config),
-    ?_assertMatch({"http://sns.amazonaws.com/", _, _, _, _, Config}, request_params()).
+    ?_assertMatch({"https://sns.amazonaws.com/", _, _, _, _, Config}, request_params()).
 
 supports_explicit_http(_) ->
     Config = (erlcloud_aws:default_config())#aws_config{sns_scheme="http://"},
@@ -452,6 +912,7 @@ doesnt_support_gopher(_) ->
     ?_assertError({sns_error, {unsupported_scheme,"gopher://"}},
                   erlcloud_sns:publish_to_topic("topicarn", "message", "subject", Config)).
 
+-dialyzer({nowarn_function, doesnt_accept_non_strings/1}).
 doesnt_accept_non_strings(_) ->
     Config = (erlcloud_aws:default_config())#aws_config{sns_scheme=https},
     ?_assertError({sns_error, badarg},

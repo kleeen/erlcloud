@@ -1,6 +1,10 @@
 -module(erlcloud_util).
--export([sha_mac/2, sha256_mac/2,
-    md5/1, sha256/1,
+
+-export([
+    sha_mac/2,
+    sha256_mac/2,
+    md5/1,
+    sha256/1,
     rand_uniform/1,
     is_dns_compliant_name/1,
     query_all/4, query_all/5,
@@ -12,45 +16,50 @@
     encode_object/2,
     encode_object_list/2,
     next_token/2,
-    filter_undef/1]).
+    filter_undef/1,
+    filter_empty_map/1,
+    filter_empty_list/1,
+    uri_parse/1,
+    http_uri_decode/1,
+    http_uri_encode/1,
+    proplists_to_map/1,
+    proplists_to_map/2
+]).
 
 -define(MAX_ITEMS, 1000).
 
+-ifdef(OTP_RELEASE).
+-if(?OTP_RELEASE >= 23).
 sha_mac(K, S) ->
-    try
-        crypto:hmac(sha, K, S)
-    catch
-        error:undef ->
-            R0 = crypto:hmac_init(sha, K),
-            R1 = crypto:hmac_update(R0, S),
-            crypto:hmac_final(R1)
-    end.
-        
+    crypto:mac(hmac, sha, K, S).
+-else.
+sha_mac(K, S) ->
+    crypto:hmac(sha, K, S).
+-endif.
+-else.
+sha_mac(K, S) ->
+    crypto:hmac(sha, K, S).
+-endif.
+
+
+-ifdef(OTP_RELEASE).
+-if(?OTP_RELEASE >= 23).
 sha256_mac(K, S) ->
-    try
-        crypto:hmac(sha256, K, S)
-    catch
-        error:undef ->
-            R0 = crypto:hmac_init(sha256, K),
-            R1 = crypto:hmac_update(R0, S),
-            crypto:hmac_final(R1)
-    end.
+    crypto:mac(hmac, sha256, K, S).
+-else.
+sha256_mac(K, S) ->
+    crypto:hmac(sha256, K, S).
+-endif.
+-else.
+sha256_mac(K, S) ->
+    crypto:hmac(sha256, K, S).
+-endif.
 
 sha256(V) ->
-    try
-        crypto:hash(sha256, V)
-    catch
-        _:_ ->
-            crypto:sha256(V)
-    end.
+    crypto:hash(sha256, V).
 
 md5(V) ->
-    try
-        crypto:hash(md5, V)
-    catch
-        _:_ ->
-            crypto:md5(V)
-    end.
+    crypto:hash(md5, V).
 
 -ifndef(ERLANG_OTP_VERSION_19).
 rand_uniform(N) ->
@@ -128,14 +137,14 @@ query_all(QueryFun, Config, Action, Params, MaxItems, Marker, Acc) ->
     end.
 
 -spec encode_list(string(), [term()]) ->
-    {ok, proplists:proplist()}.
+    proplists:proplist().
 encode_list(ElementName, Elements) ->
     Numbered = lists:zip(lists:seq(1, length(Elements)), Elements),
     [{ElementName ++ ".member." ++ integer_to_list(N), Element} ||
         {N, Element} <- Numbered].
 
 -spec encode_object(string(), proplists:proplist()) ->
-    {ok, proplists:proplist()}.
+    proplists:proplist().
 encode_object(ElementName, ElementParameters) ->
     lists:map(
         fun({Key, Value}) ->
@@ -145,7 +154,7 @@ encode_object(ElementName, ElementParameters) ->
     ).
 
 -spec encode_object_list(string(), [proplists:proplist()]) ->
-    {ok, proplists:proplist()}.
+    proplists:proplist().
 encode_object_list(Prefix, ElementParameterList) ->
     lists:flatten(lists:foldl(
         fun(ElementMap, Acc) ->
@@ -189,6 +198,83 @@ next_token(Path, XML) ->
             ok
     end.
 
--spec filter_undef(proplists:proplist()) -> proplists:proplist().
-filter_undef(List) ->
-    lists:filter(fun({_Name, Value}) -> Value =/= undefined end, List).
+-spec filter_undef(proplists:proplist() | maps:map()) ->
+    proplists:proplist() | maps:map().
+filter_undef(List) when is_list(List) ->
+    lists:filter(fun({_Name, Value}) -> Value =/= undefined end, List);
+filter_undef(Map) when is_map(Map) ->
+    maps:filter(fun(_Key, Value) -> Value =/= undefined end, Map).
+
+-spec filter_empty_map(maps:map()) -> maps:map().
+filter_empty_map(Map) when is_map(Map) ->
+    maps:filter(fun(_Key, Value) -> Value =/= #{} end, Map).
+
+-spec filter_empty_list(maps:map()) -> maps:map().
+filter_empty_list(Map) when is_map(Map) ->
+    maps:filter(fun(_Key, Value) -> Value =/= [] end, Map).
+
+-ifdef(OTP_RELEASE).
+-if(?OTP_RELEASE >= 23).
+uri_parse(Uri) ->
+    URIMap = uri_string:parse(Uri),
+    DefaultScheme = "https",
+    DefaultPort = 443,
+    Scheme = list_to_atom(maps:get(scheme, URIMap, DefaultScheme)),
+    UserInfo = maps:get(userinfo, URIMap, ""),
+    Host = maps:get(host, URIMap, ""),
+    Port = maps:get(port, URIMap, DefaultPort),
+    Path = maps:get(path, URIMap, ""),
+    Query = maps:get(query, URIMap, ""),
+    {ok, {Scheme, UserInfo, Host, Port, Path, Query}}.
+-else.
+uri_parse(Uri) ->
+    http_uri:parse(Uri).
+-endif.
+-else.
+uri_parse(Uri) ->
+    http_uri:parse(Uri).
+-endif.
+
+-ifdef(OTP_RELEASE).
+-if(?OTP_RELEASE >= 23).
+http_uri_decode(HexEncodedURI) ->
+    [{URI, true}] = uri_string:dissect_query(HexEncodedURI),
+    URI.
+-else.
+http_uri_decode(HexEncodedURI) ->
+    http_uri:decode(HexEncodedURI).
+-endif.
+-else.
+http_uri_decode(HexEncodedURI) ->
+    http_uri:decode(HexEncodedURI).
+-endif.
+
+-ifdef(OTP_RELEASE).
+-if(?OTP_RELEASE >= 23).
+http_uri_encode(URI) ->
+    uri_string:compose_query([{URI, true}]).
+-else.
+http_uri_encode(URI) ->
+    http_uri:encode(URI).
+-endif.
+-else.
+http_uri_encode(URI) ->
+    http_uri:encode(URI).
+-endif.
+
+-spec proplists_to_map(proplists:proplist() | any()) -> map() | any().
+proplists_to_map([]) -> [];
+proplists_to_map([{}]) -> #{};
+proplists_to_map([{_,_} | _] = Proplist) ->
+    proplists_to_map(Proplist, #{});
+proplists_to_map([Head | _Tail] = List) when is_list(Head) ->
+    [proplists_to_map(E) || E <- List];
+proplists_to_map(V) -> V.
+
+-spec proplists_to_map(proplists:proplist(), map()) -> map().
+proplists_to_map([], Acc) ->
+    Acc;
+proplists_to_map([{Key, Val} | Tail], Acc) when is_list(Val) ->
+    proplists_to_map(Tail, Acc#{Key => proplists_to_map(Val)});
+proplists_to_map([{Key, Val} | Tail], Acc) ->
+    proplists_to_map(Tail, Acc#{Key => Val}).

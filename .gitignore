@@ -1,6 +1,6 @@
 # IntelliJ IDEA
 /.idea
-/*.iml
+*.iml
 
 *.beam
 *.tmproj
@@ -10,10 +10,16 @@ ebin/*.app
 .eunit/
 .rebar/
 rebar
+rebar3
+.rebar3
 *.sublime-*
 deps/
 doc/
 erl_crash.dump
 .edts
+eunit.coverage.xml
+ercloud.iml
 *[#]*[#]
 *[#]*
+.dialyzer_plt
+eunit.log
